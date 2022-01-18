@@ -1,8 +1,7 @@
 use std::convert::TryFrom;
 
-use axum::body::Body;
 use axum::http::header;
-use axum::http::Response;
+use axum::response::IntoResponse;
 use columnq::datafusion::arrow;
 use columnq::encoding;
 use columnq::encoding::ContentType;
@@ -36,17 +35,17 @@ impl HandlerContext {
 }
 
 #[inline]
-pub fn bytes_to_resp(bytes: Vec<u8>, content_type: &'static str) -> Response<Body> {
-    let mut res = Response::new(Body::from(bytes));
-    res.headers_mut().insert(
+pub fn bytes_to_resp(bytes: Vec<u8>, content_type: &'static str) -> impl IntoResponse {
+    let mut headers = header::HeaderMap::new();
+    headers.insert(
         header::CONTENT_TYPE,
         header::HeaderValue::from_static(content_type),
     );
-    res
+    (headers, bytes)
 }
 
 #[inline]
-pub fn bytes_to_json_resp(bytes: Vec<u8>) -> Response<Body> {
+pub fn bytes_to_json_resp(bytes: Vec<u8>) -> impl IntoResponse {
     bytes_to_resp(bytes, "application/json")
 }
 
@@ -62,7 +61,7 @@ pub fn encode_type_from_hdr(headers: header::HeaderMap) -> encoding::ContentType
 pub fn encode_record_batches(
     content_type: encoding::ContentType,
     batches: &[arrow::record_batch::RecordBatch],
-) -> Result<Response<Body>, ApiErrResp> {
+) -> Result<impl IntoResponse, ApiErrResp> {
     let payload = match content_type {
         encoding::ContentType::Json => encoding::json::record_batches_to_bytes(batches)
             .map_err(ApiErrResp::json_serialization)?,
